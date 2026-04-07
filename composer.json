@@ -1,23 +1,31 @@
 {
-    "name": "leocore/router",
-    "description": "Lightweight MVC router for PHP 8.2+ with attribute-based routing, middleware support, and secure dispatching.",
-    "type": "library",
-    "license": "MIT",
-    "minimum-stability": "stable",
-    "keywords": ["php", "router", "mvc", "routing", "http", "middleware", "psr-4"],
-    "authors": [
-        {
-            "name": "Leo Core",
-            "email": "leocore@example.com"
-        }
-    ],
-    "require": {
-        "php": "^8.2"
-    },
-    "autoload": {
-        "psr-4": {
-            "App\\Router\\": "src/Router/",
-            "App\\Controllers\\": "src/app/Controllers/"
-        }
+  "name": "leocore/router",
+  "description": "Lightweight MVC router for PHP 8.2+ with attribute-based routing, middleware support, and secure dispatching.",
+  "type": "library",
+  "license": "MIT",
+  "minimum-stability": "stable",
+  "keywords": [
+    "php",
+    "router",
+    "mvc",
+    "routing",
+    "http",
+    "middleware",
+    "psr-4"
+  ],
+  "authors": [
+    {
+      "name": "Rocklviv",
+      "email": ""
     }
+  ],
+  "require": {
+    "php": "^8.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\Router\\": "src/Router/",
+      "App\\Controllers\\": "src/app/Controllers/"
+    }
+  }
 }
