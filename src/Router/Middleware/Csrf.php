@@ -45,16 +45,16 @@ class Csrf
 
         // --- 2. Extract Token from Request ---
         // Check POST body first, then headers (common pattern)
-        $requestToken = $requestData['csrf_token'] ?? $requestData['headers']['X-CSRF-Token'] ?? null;
+        $requestToken = $requestData['csrf_token'] ?? ($requestData['headers']['X-CSRF-Token'] ?? null);
 
         if (is_null($requestToken)) {
-            throw new HttpException(403, 'CSRF Token Missing', '/');
+            throw new HttpException(403, 'CSRF Token Missing');
         }
 
         // --- 3. Validate Token ---
         if (!hash_equals($sessionToken, $requestToken)) {
             // Token mismatch: Invalid request
-            throw new HttpException(403, 'Invalid CSRF Token', '/');
+            throw new HttpException(403, 'Invalid CSRF Token');
         }
 
         // Token is valid for this request.

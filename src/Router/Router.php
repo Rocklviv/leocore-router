@@ -5,21 +5,23 @@ declare(strict_types=1);
 namespace App\Router;
 
 use App\Router\Exceptions\HttpException;
-use App\Router\RouteAttribute;
-use ReflectionClass;
-use ReflectionMethod;
-use App\Router\Middleware\Csrf;
-use App\Router\Middleware\Cors;
 use App\Router\Middleware\MiddlewareInterface;
 
 /**
- * Lightweight MVC Router with attribute-based routing.
+ * Lightweight PHP 8.2+ routing library with pattern matching, parameter extraction,
+ * middleware support, and secure dispatching.
+ *
+ * Usage:
+ *   $router = new Router();
+ *   $router->add('/users', fn() => new Response("Users", 200));
+ *   $router->add('/users/{id}', fn(int $id) => new Response("User #{$id}", 200));
+ *   $response = $router->dispatch('GET', '/users/123');
  */
 class Router
 {
     /**
      * @var array<int,array{regex:string,methods:array,path:string,handler:callable|array|string,middleware:array<MiddlewareInterface>}>
-     * Compiled routes, now including middleware pipeline.
+     * Compiled routes with middleware pipeline.
      */
     private array $routes = [];
 
@@ -73,42 +75,6 @@ class Router
     }
 
     /**
-     * Discover routes from controller classes via #[Route] attributes.
-     *
-     * @param array<string> $controllerClasses Fully-qualified class names
-     */
-    public function discoverRoutes(array $controllerClasses): void
-    {
-        foreach ($controllerClasses as $fqcn) {
-            if (!class_exists($fqcn)) {
-                error_log("Router: controller not found: {$fqcn}");
-                continue;
-            }
-
-            $ref = new ReflectionClass($fqcn);
-
-            foreach ($ref->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
-                $attrs = $method->getAttributes(RouteAttribute::class);
-                if (empty($attrs)) {
-                    continue;
-                }
-
-                /** @var RouteAttribute $attr */
-                $attr = $attrs[0]->newInstance();
-                $methods = $attr->getMethods();
-
-                $this->routes[$this->index++] = [
-                    "regex" => $this->compilePattern($attr->getPath()),
-                    "methods" => array_values(array_unique($methods)),
-                    "path" => $attr->getPath(),
-                    "handler" => [$fqcn, $method->getName()],
-                    "middleware" => [],
-                ];
-            }
-        }
-    }
-
-    /**
      * Dispatch an incoming request to the matching route handler.
      *
      * @param string                    $method  HTTP verb (GET, POST, …)
@@ -124,7 +90,7 @@ class Router
         $method = strtoupper($method);
         $path = $this->normalizePath($path);
 
-        // Fix 3: properly detect path-traversal sequences
+        // Detect path-traversal attempts or null bytes
         if ($this->isMaliciousPath($path)) {
             throw new HttpException(
                 400,
@@ -156,7 +122,7 @@ class Router
         }
 
         if (empty($methodMatches)) {
-            // Fix 2: correctly collect all allowed methods from path-matching routes
+            // Collect all allowed methods from path-matching routes
             $routeArrays = array_column($pathMatches, "route");
             $allowed = array_unique(
                 array_merge(...array_column($routeArrays, "methods")),
@@ -182,14 +148,22 @@ class Router
             "path" => $path,
             "params" => array_slice($matches, 1),
             "body" => (string) file_get_contents("php://input"),
-            // Fix 1: safely retrieve headers — works in both web and CLI contexts
             "headers" =>
                 $headers ??
                 (function_exists("getallheaders") ? getallheaders() : []),
         ];
 
-        // 5. Execute middleware pipeline
-        $currentResponse = $response;
+        // 5. Invoke the matched handler first
+        $handlerResult = $this->invokeHandler($route, $matches);
+
+        // 6. Wrap scalar returns in a Response object
+        if ($handlerResult instanceof Response) {
+            $currentResponse = $handlerResult;
+        } else {
+            $currentResponse = Response::text((string) $handlerResult);
+        }
+
+        // 7. Execute middleware pipeline on the handler response
         foreach ($route["middleware"] as $mw) {
             try {
                 $currentResponse = $mw->handle(
@@ -201,15 +175,8 @@ class Router
             }
         }
 
-        // 6. Invoke the matched handler
-        $handlerResult = $this->invokeHandler($route, $matches);
-
-        // 7. Wrap scalar returns in a Response object
-        if ($handlerResult instanceof Response) {
-            return $handlerResult;
-        }
-
-        return Response::text((string) $handlerResult);
+        // 8. Return the final response
+        return $currentResponse;
     }
 
     /**
@@ -313,20 +280,18 @@ class Router
         if (!is_string($class) || !class_exists($class)) {
             throw new HttpException(
                 500,
-                "Controller class not found: {$class}",
+                "Handler class not found: {$class}",
             );
         }
 
-        $controller = new $class();
-
-        if (!method_exists($controller, $methodName)) {
+        if (!method_exists($class, $methodName)) {
             throw new HttpException(
                 404,
                 "Method {$methodName} not found on {$class}",
             );
         }
 
-        $reflection = new ReflectionMethod($controller, $methodName);
+        $reflection = new \ReflectionMethod($class, $methodName);
         $typedParams = [];
 
         foreach ($reflection->getParameters() as $param) {
@@ -357,7 +322,7 @@ class Router
             };
         }
 
-        return $controller->$methodName(...$typedParams);
+        return $class::$methodName(...$typedParams);
     }
 
     /**

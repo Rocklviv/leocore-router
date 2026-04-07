@@ -1,12 +1,11 @@
 # PHP Router
 
-A lightweight, modern MVC router for PHP 8.2+ with attribute-based routing, middleware support, and secure dispatching.
+A lightweight, modern PHP 8.2+ routing library with pattern matching, parameter extraction, middleware support, and secure dispatching.
 
 ## Features
 
-- **Attribute-based routing** using `#[Route(path: '/path')]`
-- **Manual route registration** via `$router->add()`
-- **Controller discovery** with reflection scanning
+- **Pattern-based routing** with named parameters (`{id}`, `{name}`, etc.)
+- **Flexible handler registration** (closures, class methods, strings)
 - **Secure dispatching** with path traversal protection
 - **Type-safe parameters** (int, float, bool automatic casting)
 - **Built-in middleware** for CSRF protection and CORS headers
@@ -30,51 +29,33 @@ cd leocore-router
 
 ## Usage Examples
 
-### Attribute-based routing
+### Simple closure handler
 
 ```php
 use App\Router\Router;
 use App\Router\Response;
 
 $router = new Router();
-$router->discoverRoutes([UserController::class]);
+$router->add('/health', fn() => new Response('OK - System Operational', 200));
 ```
 
-Controller example:
+### Handler with parameters
 
 ```php
-class UserController
-{
-    public function __construct(
-        private Router $router,
-        private string $basePath = ''
-    ) {}
-
-    #[Route('/users/{id}')]
-    public function show(int $id): Response
-    {
-        // Automatic type casting from URL parameter
-        $user = $this->getUser($id);
-        return new Response('User #' . $id);
-    }
-
-    #[Route('/users', methods: ['GET', 'POST'])]
-    public function list(): Response
-    {
-        // GET: list users, POST: create user
-        return new Response('Users list');
-    }
-}
+$router->add('/users/{id}', fn(int $id) => new Response("User #{$id}", 200));
 ```
 
-### Manual registration
+### Class method handler
 
 ```php
-$router->add(
-    '/api/data/{id}',
-    [DataController::class, 'getData'],
-    ['GET', 'DELETE']
-);
+$router->add('/api/data/{id}', [DataHandler::class, 'getData'], ['GET', 'DELETE']);
+```
+
+### Multiple HTTP methods
+
+```php
+$router->add('/users', fn() => new Response('Users list'), ['GET']);
+$router->add('/users', fn() => new Response('Create user', 201), ['POST']);
 ```
 
 ### Middleware example
@@ -86,14 +67,24 @@ use App\Router\Middleware\Cors;
 $router = new Router();
 
 // Register CSRF middleware for state-changing routes
-$router->add('/users', ['UserController::class', 'list'], ['GET'], [
+$router->add('/users', fn() => new Response('Users'), ['GET'], [
     new Csrf()
 ]);
 
 // Register CORS middleware
-$router->add('/api/*', [ApiController::class, 'index'], ['GET'], [
+$router->add('/api/*', fn() => new Response('API'), ['GET'], [
     new Cors(['origin' => 'https://example.com'])
 ]);
+```
+
+### Dispatching requests
+
+```php
+$router->add('/users/{id}', fn(int $id) => new Response("User #{$id}", 200));
+
+// Dispatch a request
+$response = $router->dispatch('GET', '/users/123');
+echo $response->getContent(); // Outputs: User #123
 ```
 
 ## API Documentation
@@ -103,67 +94,29 @@ $router->add('/api/*', [ApiController::class, 'index'], ['GET'], [
 #### `__construct()`
 Initialize the router.
 
-#### `add(string $pattern, array $route, array $methods, ?array $middleware = null)`
+#### `add(string $path, callable|array|string $handler, array $methods = ['GET'], array $middleware = [])`
 Register a new route manually.
 
 **Parameters:**
-- `$pattern`: Route pattern (e.g., `/users/{id}`)
-- `$route`: Array of [ControllerClass, method]
+- `$path`: Route pattern (e.g., `/users/{id}`)
+- `$handler`: Closure, array of `[ClassName, method]`, or string `'ClassName::method'`
 - `$methods`: Array of HTTP methods (GET, POST, PUT, etc.)
 - `$middleware`: Optional array of middleware instances
 
-#### `discoverRoutes(array $controllers)`
-Automatically discover and register routes from controller classes.
-
-**Parameters:**
-- `$controllers`: Array of controller class names or strings
-
-#### `dispatch(string $request): Response`
+#### `dispatch(string $method, string $path, ?array $headers = null): Response`
 Dispatch a request to the matched route.
 
 **Parameters:**
-- `$request`: Request URI string
+- `$method`: HTTP method (GET, POST, PUT, DELETE, PATCH, OPTIONS)
+- `$path`: Request path (without query string)
+- `$headers`: Optional array of headers (for CLI/testing)
 
 **Returns:** `Response` object
 
-#### `getRoutes(): array`
-Get all registered routes.
+#### `dumpRoutes(): array`
+Get all registered routes for debugging.
 
-#### `getRoute(string $pattern): ?array`
-Get a specific route by pattern.
-
-### Response Class
-
-#### `__construct(string $content = '', int $status = 200)`
-Create a new response.
-
-**Parameters:**
-- `$content`: Response content
-- `$status`: HTTP status code
-
-#### `getContent(): string`
-Get response content.
-
-#### `setContent(string $content): self`
-Set response content.
-
-#### `getStatus(): int`
-Get HTTP status code.
-
-#### `setStatus(int $status): self`
-Set HTTP status code.
-
-#### `send()`
-Send the response and exit.
-
-### RouteAttribute Class
-
-#### `#[Route(path: string, methods: array)]`
-Attribute for attribute-based routing.
-
-**Parameters:**
-- `path`: Route pattern with optional parameters
-- `methods`: Array of allowed HTTP methods (default: ['GET'])
+**Returns:** Array of route configurations
 
 ### Middleware
 
@@ -180,7 +133,6 @@ CORS header middleware with configurable origin and methods.
 - **CSRF protection**: Session-based token validation for state-changing operations
 - **CORS control**: Configurable per-route or global CORS headers
 - **XSS prevention**: `htmlspecialchars()` on all response content
-- **Secure file loading**: Prevents includes outside app directory
 - **Input sanitization**: Type casting and whitelist validation
 
 ## License

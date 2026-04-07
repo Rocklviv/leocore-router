@@ -16,6 +16,18 @@ class Response
     /** @var array<string,string> */
     private array $headers = [];
 
+    /**
+     * Constructor.
+     *
+     * @param string $content Response body
+     * @param int    $status  HTTP status code
+     */
+    public function __construct(string $content = '', int $status = 200)
+    {
+        $this->content = $content;
+        $this->statusCode = $status;
+    }
+
     // -------------------------------------------------------------------------
     // Static constructors
     // -------------------------------------------------------------------------

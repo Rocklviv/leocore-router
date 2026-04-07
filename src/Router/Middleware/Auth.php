@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace App\Router\Middleware;
 
-use App\Router\HttpException;
+use App\Router\Exceptions\HttpException;
 
 /**
  * Simple authentication middleware.
  */
 class Auth
 {
-    public static function authenticate(mixed $request): ?string
+    public static function authenticate(?string $authorization = null): ?string
     {
-        if (empty($_SERVER['HTTP_AUTHORIZATION'] ?? '')) {
-            throw new HttpException(401, 'Unauthorized', 'No authorization header provided');
+        if (empty($authorization ?? '')) {
+            throw new HttpException(401, 'Unauthorized', ['No authorization header provided']);
         }
 
-        $token = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        $token = $authorization;
 
         if (\substr($token, 0, 5) !== 'Bearer') {
             return null; // Allow unauthenticated routes

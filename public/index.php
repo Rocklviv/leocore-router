@@ -7,11 +7,8 @@ require __DIR__ . "/../vendor/autoload.php";
 
 use App\Router\Router;
 use App\Router\Response;
-use App\Router\Exceptions\HttpException;
 use App\Router\Middleware\Cors;
 use App\Router\Middleware\Csrf;
-use App\Controllers\DebugController;
-use App\Controllers;
 
 // --- Setup ---
 try {
@@ -20,19 +17,10 @@ try {
     $corsMiddleware = new Cors();
     $csrfMiddleware = new Csrf();
 
-    // Instantiate DebugController and register the debug route
-    $debugController = new DebugController($router);
-    $router->add(
-        "/debug/routes",
-        fn() => $debugController->listRoutes(),
-        ["GET"],
-        [],
-    );
+    // 2. Register routes with closures
+    $router->add('/health', fn() => new Response('OK - System Operational', 200));
+    $router->add('/users/{id}', fn(int $id) => new Response("User #{$id}", 200));
 
-    // 2. Discover Routes (Populates $router with registered routes)
-    // We register the example controller here.
-    $router->discoverRoutes([App\Controllers\HomeController::class]);
-    $router->dumpRoutes();
     // 3. Get Request Context
     $method = strtoupper($_SERVER["REQUEST_METHOD"] ?? "GET");
     $path = $_SERVER["REQUEST_URI"] ?? "/";
@@ -79,7 +67,7 @@ try {
         // Fallback for scalar return from handler
         Response::text((string) $finalResponse)->send();
     }
-} catch (HttpException $e) {
+} catch (\App\Router\Exceptions\HttpException $e) {
     // Handle known router/API errors (400, 403, 404, 405)
     $e->render()->send();
 } catch (\Throwable $e) {
