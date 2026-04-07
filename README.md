@@ -24,8 +24,8 @@ composer require leocore/router
 Or use directly (no dependencies needed):
 
 ```bash
-git clone https://github.com/yourusername/php-Router.git
-cd php-Router
+git clone https://github.com/Rocklviv/leocore-router.git
+cd leocore-router
 ```
 
 ## Usage Examples
