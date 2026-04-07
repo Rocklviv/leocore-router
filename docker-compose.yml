@@ -1,0 +1,17 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8088:80"
+    volumes:
+      - ./public:/var/www/html/public
+      - ./app:/var/www/html/app
+      - ./src:/var/www/html/src
+      - ./tests:/var/www/html/tests
+    environment:
+      - PHP_AUTH_USER=
+      - PHP_AUTH_PASS=
+
+# Named volume for vendor cache between rebuilds
+volumes:
+  vendor:
